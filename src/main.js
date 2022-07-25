@@ -1,5 +1,8 @@
 import { createApp } from 'vue'
-import './style.css'
+// import './style.css'
 import App from './App.vue'
+import createMyI18n from './lang'
 
-createApp(App).mount('#app')
+const app = createApp(App)
+app.use(createMyI18n(mw.config.get('wgUserLanguage')))
+app.mount('#app')

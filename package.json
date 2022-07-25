@@ -6,13 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "i18n": "py ./node_modules/mediawiki-gadget-i18n-helper/i18n.py --mode=i18n --indent=2 src/i18n/zh-hant.json src/i18n/zh-hans.json",
+    "geni18n": "py ./node_modules/mediawiki-gadget-i18n-helper/migrate-to-json.py src/App.vue src/i18n/zh-hans.json src/i18n/zh-hant.json --other_function mt"
   },
   "dependencies": {
     "vue": "^3.2.37"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^3.0.0",
-    "vite": "^3.0.0"
+    "@wikimedia/codex": "^0.1.0-alpha.8",
+    "@wikimedia/codex-icons": "^0.1.0-alpha.8",
+    "mediawiki-gadget-i18n-helper": "github:Xi-Plus/mediawiki-gadget-i18n-helper",
+    "vite": "^3.0.0",
+    "vue-i18n": "^9.1.10"
   }
 }

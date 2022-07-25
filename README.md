@@ -1,7 +1,8 @@
-# Vue 3 + Vite
+# unblock-zh-generator
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## Steps
 
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+1. 檢查封鎖狀態
+2. 未被封鎖，詢問IP / 帳號
+3. 詢問帳號
+4. 告知封鎖問題
