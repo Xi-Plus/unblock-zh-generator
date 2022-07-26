@@ -1,11 +1,11 @@
 <template>
   <div style="max-width: 600px; margin: 0 auto">
-    <div v-if="checking">
+    <div v-if="checkingIp || checkingAcct">
       <cdx-progress-bar />
       <p>{{ $t('checking-blocks') }}</p>
     </div>
 
-    <div v-if="!checking && !ipBlocked && !acctBlocked">
+    <div v-if="!checkingIp && !checkingAcct && !ipBlocked && !acctBlocked">
       <div v-if="wgUserName">
         {{ $t('no-blocks-found-logged-in') }}
       </div>
@@ -33,13 +33,17 @@
       </div>
     </div>
 
-    <div v-if="!checking && acctBlocked">
+    <div v-if="acctBlocked">
       <div>
         {{ $t('account-blocked') }}
 
         <fieldset>
           <legend>{{ $t('account-blocked-reason') }}</legend>
-          <div v-html="acctBlockReasonParsed"></div>
+          <div v-if="acctBlockReasonParsed" v-html="acctBlockReasonParsed"></div>
+          <div v-else>
+            <cdx-progress-bar :inline="true" />
+            {{ $t('parsing-blocked-reason') }}
+          </div>
         </fieldset>
 
         <div v-if="anyAllowUT">
@@ -69,12 +73,40 @@
           <div>
             <p>{{ $t('unblock-reason') }}</p>
             <textarea v-model="unblockReason" class="cdx-text-input__input" cols="40" rows="5"></textarea>
-            <cdx-button class="uzg-mt20" type="primary" action="progressive">
+            <cdx-button class="uzg-mt20" type="primary" action="progressive" @click="generateMail">
               {{ $t('generate-mail') }}
             </cdx-button>
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-if="mailContent" class="uzg-mt20">
+      <p>
+        {{ $t('create-mail-has-client') }}
+      </p>
+      <div>
+        <a :href="mailLink" target="_blank">
+          <cdx-button @click="generateMail">{{ $t('create-mail-button') }}</cdx-button>
+        </a>
+      </div>
+      <p>
+        {{ $t('create-mail-copy') }}
+      </p>
+      <p>
+        <a href="mailto:unblock-zh@lists.wikimedia.org" target="_blank">unblock-zh@lists.wikimedia.org</a>
+      </p>
+      <fieldset>
+        <legend>{{ $t('mail-subject') }}</legend>
+        Test
+      </fieldset>
+      <fieldset style="background-color: #eaecf0">
+        <legend>{{ $t('mail-body') }}</legend>
+        <div style="white-space: pre">{{ mailContent }}</div>
+      </fieldset>
+      <p>
+        {{ $t('create-mail-send-and-wait') }}
+      </p>
     </div>
 
     <div v-if="false">
@@ -212,7 +244,8 @@ export default {
     CdxProgressBar,
   },
   data: () => ({
-    checking: true,
+    checkingIp: true,
+    checkingAcct: false,
     blockedAct: null,
     acctState: null,
     givenUsername: '',
@@ -232,20 +265,22 @@ export default {
     acctBlockReason: '',
     acctBlockReasonParsed: '',
     unblockReason: '',
+    mailContent: '',
   }),
   async created() {
     $('title').text(this.$t('document-title'))
-    $('#firstHeading').text(this.$t('heading-title'))
-    await this.getMyIp()
-    await this.checkIpBlocks(this.myIp)
+    $('#firstHeading').text(this.$t('heading-title', [import.meta.env.VITE_APP_VERSION]))
+
+    this.getMyIp().then(() => {
+      this.checkIpBlocks(this.myIp).then(() => {
+        this.checkingIp = false
+      })
+    })
     if (this.wgUserName) {
-      await this.checkAcctBlocks(this.wgUserName)
-    }
-    this.checking = false
-    if (this.ipBlocked || this.acctBlocked) {
-      this.step = 3
-    } else {
-      this.step = 2
+      this.checkingAcct = true
+      this.checkAcctBlocks(this.wgUserName).then(() => {
+        this.checkingAcct = false
+      })
     }
     window.vue = this
   },
@@ -261,6 +296,9 @@ export default {
         return false
       }
       return true
+    },
+    mailLink() {
+      return 'mailto:unblock-zh@lists.wikimedia.org?subject=封鎖申訴&body=' + this.mailContent
     },
   },
   methods: {
@@ -389,8 +427,9 @@ export default {
           this.acctAllowUT = true
         }
         this.acctBlockReason = block.reason
-        let parsed = await api.parse(this.acctBlockReason)
-        this.acctBlockReasonParsed = parsed
+        api.parse(this.acctBlockReason).then((res) => {
+          this.acctBlockReasonParsed = res
+        })
       }
       if ('groupmemberships' in user) {
         for (const row of user.groupmemberships) {
@@ -418,6 +457,23 @@ export default {
           let user = res.query
           return user
         })
+    },
+    generateMail() {
+      this.mailContent = this.$t('mail-content-hello') + '\n'
+      if (this.acctBlocked) {
+        this.mailContent +=
+          this.$t('mail-content-my-username', [this.normalizedUsername]) +
+          '\n' +
+          this.$t('mail-content-unblock-reason') +
+          '\n' +
+          this.unblockReason.trim() +
+          '\n\n' +
+          this.normalizedUsername +
+          '\n' +
+          new Date().toISOString().substr(0, 10) +
+          '\n\n' +
+          this.$t('mail-content-footer', [import.meta.env.VITE_APP_VERSION])
+      }
     },
   },
 }
