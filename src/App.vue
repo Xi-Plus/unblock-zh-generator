@@ -1,12 +1,11 @@
 <template>
   <div style="max-width: 600px; margin: 0 auto">
-    <div v-if="step == 1">
-      <div>
-        {{ $t('checking-blocks') }}
-      </div>
+    <div v-if="checking">
+      <cdx-progress-bar />
+      <p>{{ $t('checking-blocks') }}</p>
     </div>
 
-    <div v-if="step == 2">
+    <div v-if="!checking && !ipBlocked && !acctBlocked">
       <div v-if="wgUserName">
         {{ $t('no-blocks-found-logged-in') }}
       </div>
@@ -34,21 +33,51 @@
       </div>
     </div>
 
-    <div v-if="step == 3">
+    <div v-if="!checking && acctBlocked">
       <div>
-        {{ $t('not-login') }}
-      </div>
+        {{ $t('account-blocked') }}
 
-      <div class="uzg-mt20">
-        <cdx-radio v-model="acctState" name="acct-state" inputValue="no-account">
-          {{ $t('acct-state-no-account') }}
-        </cdx-radio>
-        <cdx-radio v-model="acctState" name="acct-state" inputValue="cannot-login">
-          {{ $t('acct-state-cannot-login') }}
-        </cdx-radio>
+        <fieldset>
+          <legend>{{ $t('account-blocked-reason') }}</legend>
+          <div v-html="acctBlockReasonParsed"></div>
+        </fieldset>
+
+        <div v-if="anyAllowUT">
+          <div>{{ $t('account-blocked-go-talk') }}</div>
+
+          <div class="uzg-mt20" style="text-align: center">
+            <a
+              :href="
+                getUrl('Special:MyTalk', {
+                  action: 'edit',
+                  section: 'new',
+                  nosummary: 1,
+                  preload: 'Template:Blocks_review/preload',
+                  'preloadparams[]': acctBlockId,
+                })
+              "
+            >
+              <cdx-button type="primary" action="progressive">
+                {{ $t('unblock-at-talk') }}
+              </cdx-button>
+            </a>
+          </div>
+        </div>
+        <div v-else>
+          <div>{{ $t('account-blocked-go-mail') }}</div>
+
+          <div>
+            <p>{{ $t('unblock-reason') }}</p>
+            <textarea v-model="unblockReason" class="cdx-text-input__input" cols="40" rows="5"></textarea>
+            <cdx-button class="uzg-mt20" type="primary" action="progressive">
+              {{ $t('generate-mail') }}
+            </cdx-button>
+          </div>
+        </div>
       </div>
     </div>
-    <div v-if="step == 4">
+
+    <div v-if="false">
       <div>
         {{ $t('blocked-action') }}
       </div>
@@ -83,7 +112,7 @@
         </div>
       </div>
     </div>
-    <div v-else-if="step == 4">
+    <div v-if="false">
       <div v-if="wgUserName">
         <div>
           {{ $t('acct-state-login-ask', [wgUserName]) }}
@@ -135,7 +164,7 @@
       </div>
     </div>
 
-    <div v-else-if="step == 3">
+    <div v-if="false">
       <div>
         {{ $t('input-username') }}
         <cdx-search-input
@@ -168,7 +197,7 @@
 </template>
 
 <script>
-import { CdxButton, CdxRadio, CdxTextInput, CdxSearchInput, CdxMessage } from '@wikimedia/codex'
+import { CdxButton, CdxRadio, CdxTextInput, CdxSearchInput, CdxMessage, CdxProgressBar } from '@wikimedia/codex'
 
 var api = new mw.Api()
 
@@ -180,9 +209,10 @@ export default {
     CdxTextInput,
     CdxSearchInput,
     CdxMessage,
+    CdxProgressBar,
   },
   data: () => ({
-    step: 1,
+    checking: true,
     blockedAct: null,
     acctState: null,
     givenUsername: '',
@@ -196,9 +226,12 @@ export default {
     ipHardBlock: false,
     ipBlockReason: '',
     acctBlocked: false,
+    acctBlockId: null,
     acctHasIpbe: false,
     acctAllowUT: false,
     acctBlockReason: '',
+    acctBlockReasonParsed: '',
+    unblockReason: '',
   }),
   async created() {
     $('title').text(this.$t('document-title'))
@@ -208,6 +241,7 @@ export default {
     if (this.wgUserName) {
       await this.checkAcctBlocks(this.wgUserName)
     }
+    this.checking = false
     if (this.ipBlocked || this.acctBlocked) {
       this.step = 3
     } else {
@@ -230,6 +264,7 @@ export default {
     },
   },
   methods: {
+    getUrl: mw.util.getUrl,
     nextStep() {
       this.step += 1
     },
@@ -333,6 +368,7 @@ export default {
       this.normalizedUsername = ''
       this.userRegistration = ''
       this.acctBlocked = false
+      this.acctBlockId = null
       this.acctHasIpbe = false
 
       let query = await this.getAcctBlocks(username)
@@ -348,10 +384,13 @@ export default {
       }
       if (block) {
         this.acctBlocked = true
+        this.acctBlockId = block.id
         if (block.allowusertalk) {
           this.acctAllowUT = true
         }
         this.acctBlockReason = block.reason
+        let parsed = await api.parse(this.acctBlockReason)
+        this.acctBlockReasonParsed = parsed
       }
       if ('groupmemberships' in user) {
         for (const row of user.groupmemberships) {
@@ -372,7 +411,7 @@ export default {
           usprop: 'groupmemberships',
           ususers: username,
           bkusers: username,
-          bkprop: 'by|reason|flags',
+          bkprop: 'id|by|reason|flags',
           guiuser: username,
         })
         .then(function (res) {
